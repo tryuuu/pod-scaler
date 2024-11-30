@@ -1,0 +1,8 @@
+apiVersion: scaling.example.com/v1
+kind: PodScaler
+metadata:
+  name: example-podscaler
+spec:
+  count: 3
+  selector:
+    app: nginx
