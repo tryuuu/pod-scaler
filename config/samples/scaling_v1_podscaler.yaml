@@ -1,0 +1,9 @@
+apiVersion: scaling.example.com/v1
+kind: PodScaler
+metadata:
+  labels:
+    app.kubernetes.io/name: pod-scaler
+    app.kubernetes.io/managed-by: kustomize
+  name: podscaler-sample
+spec:
+  # TODO(user): Add fields here
