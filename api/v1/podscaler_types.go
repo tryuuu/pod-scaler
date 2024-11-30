@@ -29,7 +29,11 @@ type PodScalerSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of PodScaler. Edit podscaler_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Foo string `json:"foo,omitempty"`
+	// 強制的に保持するPodの数
+	Count int `json:"count"`
+	// Podのラベルセレクタ
+	Selector map[string]string `json:"selector"`
 }
 
 // PodScalerStatus defines the observed state of PodScaler.
