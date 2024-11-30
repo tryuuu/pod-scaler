@@ -19,10 +19,13 @@ package controller
 import (
 	"context"
 
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	scalingv1 "example.com/pod-scaler/api/v1"
 )
@@ -31,6 +34,7 @@ import (
 type PodScalerReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Log    logr.Logger
 }
 
 // +kubebuilder:rbac:groups=scaling.example.com,resources=podscalers,verbs=get;list;watch;create;update;patch;delete
@@ -47,10 +51,65 @@ type PodScalerReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.1/pkg/reconcile
 func (r *PodScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	// ログをPodScalerに紐づける
+	log := r.Log.WithValues("podscaler", req.NamespacedName)
 
-	// TODO(user): your logic here
+	// PodScaler型
+	var podScaler scalingv1.PodScaler
+	// 指定した名前空間と名前に基づいてPodScalerを取得
+	if err := r.Get(ctx, req.NamespacedName, &podScaler); err != nil {
+		log.Error(err, "unable to fetch PodScaler")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
+	// 対象のPodをリスト
+	var pods corev1.PodList
+	labelSelector := labels.SelectorFromSet(podScaler.Spec.Selector)
+	if err := r.List(ctx, &pods, &client.ListOptions{
+		Namespace:     req.Namespace,
+		LabelSelector: labelSelector,
+	}); err != nil {
+		log.Error(err, "unable to list pods")
+		return ctrl.Result{}, err
+	}
+
+	// Podの数を調整
+	currentCount := len(pods.Items)
+	desiredCount := podScaler.Spec.Count
+
+	if currentCount < desiredCount {
+		for i := 0; i < (desiredCount - currentCount); i++ {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "scaled-pod-",
+					Namespace:    req.Namespace,
+					Labels:       podScaler.Spec.Selector,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:latest",
+						},
+					},
+				},
+			}
+			if err := r.Create(ctx, pod); err != nil {
+				log.Error(err, "unable to create Pod")
+				return ctrl.Result{}, err
+			}
+		}
+	} else if currentCount > desiredCount {
+		// Podを削除
+		for i := 0; i < (currentCount - desiredCount); i++ {
+			pod := &pods.Items[i]
+			if err := r.Delete(ctx, pod); err != nil {
+				log.Error(err, "unable to delete Pod")
+				return ctrl.Result{}, err
+			}
+		}
+	}
+	log.Info("Reconciliation complete", "currentCount", currentCount, "desiredCount", desiredCount)
 	return ctrl.Result{}, nil
 }
 
