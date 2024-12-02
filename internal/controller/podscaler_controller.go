@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -77,7 +78,11 @@ func (r *PodScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Podの数を調整
 	currentCount := len(pods.Items)
-	desiredCount := podScaler.Spec.Count
+	// podScaler.Spec.Countが0なら4を指定、0じゃなければpodScaler.Spec.Count
+	desiredCount := 4 // デフォルト値
+	if podScaler.Spec.Count != 0 {
+		desiredCount = podScaler.Spec.Count
+	}
 
 	if currentCount < desiredCount {
 		for i := 0; i < (desiredCount - currentCount); i++ {
@@ -120,7 +125,8 @@ func (r *PodScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 	logger.Info("Reconciliation complete", "currentCount", currentCount, "desiredCount", desiredCount)
-	return ctrl.Result{}, nil
+	// 15秒ごとに再起動
+	return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
