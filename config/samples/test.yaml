@@ -3,6 +3,6 @@ kind: PodScaler
 metadata:
   name: example-podscaler
 spec:
-  count: 3
+  count: 4
   selector:
     app: nginx

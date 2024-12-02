@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	scalingv1 "example.com/pod-scaler/api/v1"
 )
@@ -52,13 +53,14 @@ type PodScalerReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.1/pkg/reconcile
 func (r *PodScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// ログをPodScalerに紐づける
-	log := r.Log.WithValues("podscaler", req.NamespacedName)
-
+	//log := r.Log.WithValues("podscaler", req.NamespacedName)
+	logger := log.FromContext(ctx)
+	logger.Info("Reconciling PodScaler")
 	// PodScaler型
 	var podScaler scalingv1.PodScaler
 	// 指定した名前空間と名前に基づいてPodScalerを取得
 	if err := r.Get(ctx, req.NamespacedName, &podScaler); err != nil {
-		log.Error(err, "unable to fetch PodScaler")
+		logger.Error(err, "unable to fetch PodScaler")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -69,7 +71,7 @@ func (r *PodScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		Namespace:     req.Namespace,
 		LabelSelector: labelSelector,
 	}); err != nil {
-		log.Error(err, "unable to list pods")
+		logger.Error(err, "unable to list pods")
 		return ctrl.Result{}, err
 	}
 
@@ -94,8 +96,13 @@ func (r *PodScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 					},
 				},
 			}
+			// podのOwnerReferenceを設定
+			if err := ctrl.SetControllerReference(&podScaler, pod, r.Scheme); err != nil {
+				logger.Error(err, "unable to set OwnerReference for Pod")
+				return ctrl.Result{}, err
+			}
 			if err := r.Create(ctx, pod); err != nil {
-				log.Error(err, "unable to create Pod")
+				logger.Error(err, "unable to create Pod")
 				return ctrl.Result{}, err
 			}
 		}
@@ -104,12 +111,15 @@ func (r *PodScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		for i := 0; i < (currentCount - desiredCount); i++ {
 			pod := &pods.Items[i]
 			if err := r.Delete(ctx, pod); err != nil {
-				log.Error(err, "unable to delete Pod")
-				return ctrl.Result{}, err
+				// 削除対象が存在しない場合はスキップ
+				if client.IgnoreNotFound(err) != nil {
+					logger.Error(err, "unable to delete Pod")
+					return ctrl.Result{}, err
+				}
 			}
 		}
 	}
-	log.Info("Reconciliation complete", "currentCount", currentCount, "desiredCount", desiredCount)
+	logger.Info("Reconciliation complete", "currentCount", currentCount, "desiredCount", desiredCount)
 	return ctrl.Result{}, nil
 }
 
@@ -117,6 +127,7 @@ func (r *PodScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func (r *PodScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&scalingv1.PodScaler{}).
+		Owns(&corev1.Pod{}). // 監視対象としてpodを指定
 		Named("podscaler").
 		Complete(r)
 }
