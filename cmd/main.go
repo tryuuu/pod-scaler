@@ -37,6 +37,7 @@ import (
 
 	scalingv1 "example.com/pod-scaler/api/v1"
 	"example.com/pod-scaler/internal/controller"
+	webhookscalingv1 "example.com/pod-scaler/internal/webhook/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -148,6 +149,13 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PodScaler")
 		os.Exit(1)
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = webhookscalingv1.SetupPodScalerWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "PodScaler")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 
