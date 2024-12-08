@@ -59,14 +59,16 @@ var _ webhook.CustomDefaulter = &PodScalerCustomDefaulter{}
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind PodScaler.
 func (d *PodScalerCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
 	podscaler, ok := obj.(*scalingv1.PodScaler)
-
 	if !ok {
 		return fmt.Errorf("expected an PodScaler object but got %T", obj)
 	}
+
+	// Mutating Admission Webhookのデフォルト値を設定(spec.count)
+	if podscaler.Spec.Count == 0 {
+		podscaler.Spec.Count = 5
+	}
+
 	podscalerlog.Info("Defaulting for PodScaler", "name", podscaler.GetName())
-
-	// TODO(user): fill in your defaulting logic.
-
 	return nil
 }
 
@@ -92,9 +94,17 @@ func (v *PodScalerCustomValidator) ValidateCreate(ctx context.Context, obj runti
 	if !ok {
 		return nil, fmt.Errorf("expected a PodScaler object but got %T", obj)
 	}
-	podscalerlog.Info("Validation for PodScaler upon creation", "name", podscaler.GetName())
 
-	// TODO(user): fill in your validation logic upon object creation.
+	// validating admission webhookの設定
+	if podscaler.Spec.Count < 1 {
+		return nil, fmt.Errorf("count must be greater than 0")
+	}
+
+	if len(podscaler.Spec.Selector) == 0 {
+		return nil, fmt.Errorf("selector must be specified")
+	}
+
+	podscalerlog.Info("Validation for PodScaler upon creation", "name", podscaler.GetName())
 
 	return nil, nil
 }
@@ -102,12 +112,20 @@ func (v *PodScalerCustomValidator) ValidateCreate(ctx context.Context, obj runti
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type PodScaler.
 func (v *PodScalerCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	podscaler, ok := newObj.(*scalingv1.PodScaler)
+
+	// validating admission webhookの設定
+	if podscaler.Spec.Count < 1 {
+		return nil, fmt.Errorf("count must be greater than 0")
+	}
+
+	if len(podscaler.Spec.Selector) == 0 {
+		return nil, fmt.Errorf("selector must be specified")
+	}
+
 	if !ok {
 		return nil, fmt.Errorf("expected a PodScaler object for the newObj but got %T", newObj)
 	}
 	podscalerlog.Info("Validation for PodScaler upon update", "name", podscaler.GetName())
-
-	// TODO(user): fill in your validation logic upon object update.
 
 	return nil, nil
 }
