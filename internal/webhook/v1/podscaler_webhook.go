@@ -64,7 +64,7 @@ func (d *PodScalerCustomDefaulter) Default(ctx context.Context, obj runtime.Obje
 	}
 
 	// Mutating Admission Webhookのデフォルト値を設定(spec.count)
-	if podscaler.Spec.Count == 0 {
+	if podscaler.Spec.Count < 1 {
 		podscaler.Spec.Count = 5
 	}
 
