@@ -110,6 +110,7 @@ func (v *PodScalerCustomValidator) ValidateCreate(ctx context.Context, obj runti
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type PodScaler.
+// PodScalerCustomValidatorのインターフェースを満たす
 func (v *PodScalerCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	podscaler, ok := newObj.(*scalingv1.PodScaler)
 

@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: pod-scaler
     app.kubernetes.io/managed-by: kustomize
   name: selfsigned-issuer
-  namespace: system
+  namespace: pod-scaler-system
 spec:
   selfSigned: {}
 ---
@@ -23,12 +23,13 @@ metadata:
     app.kubernetes.io/part-of: pod-scaler
     app.kubernetes.io/managed-by: kustomize
   name: serving-cert  # this name should match the one appeared in kustomizeconfig.yaml
-  namespace: system
+  namespace: pod-scaler-system
 spec:
   # SERVICE_NAME and SERVICE_NAMESPACE will be substituted by kustomize
   dnsNames:
   - SERVICE_NAME.SERVICE_NAMESPACE.svc
   - SERVICE_NAME.SERVICE_NAMESPACE.svc.cluster.local
+  - pod-scaler-webhook-service.pod-scaler-system.svc
   issuerRef:
     kind: Issuer
     name: selfsigned-issuer
